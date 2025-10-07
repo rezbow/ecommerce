@@ -67,12 +67,21 @@ func (handler *CartHandler) AddToCart(ctx *gin.Context) {
 	}
 
 	if err := handler.cartSvc.AddToUserCart(userId, &itemCart); err != nil {
-		if errors.Is(err, services.ErrProductNotFound) {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
-			return
+		switch {
+		case errors.Is(err, services.ErrProductNotFound):
+			{
+				ctx.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
+			}
+		case errors.Is(err, services.ErrInsufficientQuantity):
+			{
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 
+			}
+		default:
+			{
+				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+			}
 		}
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 

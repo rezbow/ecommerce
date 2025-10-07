@@ -44,6 +44,12 @@ func (svc *CartService) GetUserCart(userId uuid.UUID) (*models.Cart, error) {
 		}
 		return nil, ErrInternal
 	}
+	// sync the entire cart with database
+	svc.SyncCart(cart)
+	// save it to cache
+	if err := svc.cartRepo.Save(userId.String(), cart, cacheDuration); err != nil {
+		return nil, ErrInternal
+	}
 	return cart, nil
 }
 
@@ -68,23 +74,14 @@ func (svc *CartService) AddToUserCart(userId uuid.UUID, itemCartRequest *models.
 		return ErrInternal
 	}
 
-	item := userCart.FindItem(itemCartRequest.ProductId)
-	if item == nil {
-		item = models.NewCartItem(product.ID)
-		userCart.Add(item)
-	}
-
-	if itemCartRequest.Quantity+item.Quantity > product.StockQuantity {
+	if itemCartRequest.Quantity+userCart.ItemQuantity(product.ID) > product.StockQuantity {
 		return ErrInsufficientQuantity
 	}
 
-	// update item state
-	item.AddToQuantity(itemCartRequest.Quantity)
-	item.Sync(product)
-	// update cart state
-	userCart.Update()
+	// add to item quantity or insert if item with product.ID
+	// doesn't exists in our cart
+	userCart.AddQuantityOrInsert(product, itemCartRequest.Quantity)
 
-	// add it to cache
 	if err := svc.cartRepo.Save(userId.String(), userCart, cacheDuration); err != nil {
 		return ErrInternal
 	}
@@ -104,9 +101,6 @@ func (svc *CartService) RemoveItemFromCart(userId uuid.UUID, productId uuid.UUID
 		return ErrItemNotFound
 	}
 
-	// update cart state
-	userCart.Update()
-
 	if err := svc.cartRepo.Save(userId.String(), userCart, cacheDuration); err != nil {
 		return ErrInternal
 	}
@@ -122,4 +116,31 @@ func (svc *CartService) ClearCart(userId uuid.UUID) error {
 		return ErrInternal
 	}
 	return nil
+}
+
+func (svc *CartService) SyncCart(cart *models.Cart) {
+	refreshedItems := make([]*models.CartItem, 0)
+	for _, item := range cart.Items {
+		product, err := svc.productRepo.Get(item.ProductId)
+		if err != nil {
+			continue
+		}
+		if product.StockQuantity == 0 {
+			continue
+		}
+
+		newItem := models.NewCartItem(item.ProductId)
+		if product.StockQuantity < item.Quantity {
+			newItem.Quantity = product.StockQuantity
+		} else {
+			newItem.Quantity = item.Quantity
+		}
+		newItem.Price = product.Price
+		newItem.Name = product.Name
+		newItem.SubTotal = int64(newItem.Quantity) * newItem.Price
+
+		refreshedItems = append(refreshedItems, newItem)
+
+	}
+	cart.SetItems(refreshedItems)
 }

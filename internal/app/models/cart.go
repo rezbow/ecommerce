@@ -1,6 +1,8 @@
 package models
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+)
 
 type Cart struct {
 	UserId uuid.UUID   `json:"user_id"`
@@ -15,7 +17,12 @@ func NewCart(userId uuid.UUID) *Cart {
 	}
 }
 
-func (c *Cart) Update() {
+func (c *Cart) SetItems(items []*CartItem) {
+	c.Items = items
+	c.update()
+}
+
+func (c *Cart) update() {
 	var total int64
 	for _, item := range c.Items {
 		total += item.SubTotal
@@ -27,23 +34,44 @@ func (c *Cart) Remove(productId uuid.UUID) bool {
 	for idx, item := range c.Items {
 		if item.ProductId == productId {
 			c.Items = append(c.Items[:idx], c.Items[idx+1:]...)
+			c.update()
 			return true
 		}
 	}
 	return false
 }
 
-func (c *Cart) Add(item *CartItem) {
-	c.Items = append(c.Items, item)
-}
-
-func (c *Cart) FindItem(id uuid.UUID) *CartItem {
+func (c *Cart) findItem(id uuid.UUID) *CartItem {
 	for _, item := range c.Items {
 		if item.ProductId == id {
 			return item
 		}
 	}
 	return nil
+}
+
+func (c *Cart) ItemQuantity(id uuid.UUID) int {
+	if item := c.findItem(id); item != nil {
+		return item.Quantity
+	}
+	return 0
+}
+
+func (c *Cart) AddQuantityOrInsert(product *Product, quantity int) {
+	if item := c.findItem(product.ID); item != nil {
+		item.Quantity += quantity
+		item.SubTotal = int64(item.Quantity) * item.Price
+		c.update()
+		return
+	}
+	item := NewCartItem(product.ID)
+	item.Name = product.Name
+	item.Price = product.Price
+	item.Quantity = quantity
+	item.SubTotal = int64(item.Quantity) * item.Price
+
+	c.Items = append(c.Items, item)
+	c.update()
 }
 
 type CartItem struct {
@@ -58,19 +86,4 @@ func NewCartItem(productId uuid.UUID) *CartItem {
 	return &CartItem{
 		ProductId: productId,
 	}
-}
-
-func (item *CartItem) calculateSubTotal() {
-	item.SubTotal = item.Price * int64(item.Quantity)
-}
-
-func (item *CartItem) Sync(product *Product) {
-	item.Name = product.Name
-	item.Price = product.Price
-	item.calculateSubTotal()
-}
-
-func (item *CartItem) AddToQuantity(n int) {
-	item.Quantity += n
-	item.calculateSubTotal()
 }

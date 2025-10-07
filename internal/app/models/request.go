@@ -1,5 +1,7 @@
 package models
 
+import "github.com/google/uuid"
+
 type RegisterUser struct {
 	Email    string `json:"email" binding:"required"`
 	Password string `json:"password" binding:"required"`
@@ -75,4 +77,17 @@ func (p *ProductUpdateRequest) ToMap() map[string]any {
 		result["stock_quantity"] = *p.StockQuantity
 	}
 	return result
+}
+
+type ItemCartRequest struct {
+	ProductId uuid.UUID `json:"product_id" binding:"required"`
+	Quantity  int       `json:"quantity" binding:"required"`
+}
+
+func (i *ItemCartRequest) Validate() (bool, map[string]string) {
+	errs := make(map[string]string)
+	if i.Quantity <= 0 {
+		errs["quantity"] = "quantity should be greater than 0"
+	}
+	return len(errs) == 0, errs
 }

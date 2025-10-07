@@ -9,7 +9,7 @@ import (
 
 type Config struct {
 	JWTSecret string
-	// db
+	// database
 	DBHost string
 	DBPort string
 	DBUser string
@@ -52,5 +52,6 @@ func LoadConfig() (*Config, error) {
 	if config.DBPass == "" {
 		return nil, errors.New("missing DB_PASS from .env")
 	}
+
 	return &config, nil
 }

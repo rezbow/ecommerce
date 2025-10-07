@@ -44,3 +44,20 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+func AdminMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		isAdminVal, exists := c.Get("isAdmin")
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"errors": "unauthorized"})
+			return
+		}
+
+		isAdmin, ok := isAdminVal.(bool)
+		if !ok || !isAdmin {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"errors": "Requires Administrator privileges"})
+			return
+		}
+		c.Next()
+	}
+}

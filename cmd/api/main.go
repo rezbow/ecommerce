@@ -61,11 +61,11 @@ func main() {
 	{
 		protected.POST("/profile", userHandler.Profile)
 		// endpoints for cart operations
-		protected.GET("/cart", cartHandler.GetCart)           // getting user's cart information
-		protected.POST("/cart", cartHandler.AddToCart)        // adding an item to cart
-		protected.PUT("/cart")                                // update quantity of an item in cart
-		protected.DELETE("/cart/:id", cartHandler.DeleteItem) // delete a specific item with id in the cart
-		protected.DELETE("/cart", cartHandler.ClearCart)      // delete the entire cart
+		protected.GET("/cart", cartHandler.GetCart)                // getting user's cart information
+		protected.POST("/cart", cartHandler.AddToCart)             // adding an item to cart
+		protected.PUT("/cart/:id", cartHandler.UpdateItemQuantity) // update quantity of an item in cart
+		protected.DELETE("/cart/:id", cartHandler.DeleteItem)      // delete a specific item with id in the cart
+		protected.DELETE("/cart", cartHandler.ClearCart)           // delete the entire cart
 		// endpoint for user's order details
 		protected.GET("/orders")
 		protected.GET("/orders/:id")

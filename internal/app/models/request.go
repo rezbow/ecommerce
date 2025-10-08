@@ -91,3 +91,15 @@ func (i *ItemCartRequest) Validate() (bool, map[string]string) {
 	}
 	return len(errs) == 0, errs
 }
+
+type ItemQuantityUpdate struct {
+	NewQuantity int `json:"new_quantity" binding:"required"`
+}
+
+func (i *ItemQuantityUpdate) Validate() (bool, map[string]string) {
+	errs := make(map[string]string)
+	if i.NewQuantity <= 0 {
+		errs["new_quantity"] = "new_quantity should be greater than 0"
+	}
+	return len(errs) == 0, errs
+}

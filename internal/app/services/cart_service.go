@@ -22,6 +22,7 @@ type ICartService interface {
 	AddToUserCart(uuid.UUID, *models.ItemCartRequest) error
 	RemoveItemFromCart(uuid.UUID, uuid.UUID) error
 	ClearCart(uuid.UUID) error
+	UpdateItemQuantity(uuid.UUID, uuid.UUID, *models.ItemQuantityUpdate) error
 }
 
 type CartService struct {
@@ -143,4 +144,58 @@ func (svc *CartService) SyncCart(cart *models.Cart) {
 
 	}
 	cart.SetItems(refreshedItems)
+}
+
+func (svc *CartService) UpdateItemQuantity(userId uuid.UUID, productId uuid.UUID, itemQuantityUpdate *models.ItemQuantityUpdate) error {
+	userCart, err := svc.cartRepo.Get(userId.String())
+	if errors.Is(err, database.ErrRecordNotFound) {
+		return ErrCartNotFound
+	} else if err != nil {
+		return ErrInternal
+	}
+
+	updatedItems := make([]*models.CartItem, 0)
+	found := false
+	for _, item := range userCart.Items {
+		if item.ProductId != productId {
+			updatedItems = append(updatedItems, item)
+			continue
+		}
+
+		found = true
+
+		if itemQuantityUpdate.NewQuantity == 0 {
+			break
+		}
+		product, err := svc.productRepo.Get(productId)
+		if errors.Is(err, database.ErrRecordNotFound) {
+			return ErrProductNotFound
+		} else if err != nil {
+			return ErrInternal
+		}
+
+		if itemQuantityUpdate.NewQuantity > product.StockQuantity {
+			return ErrInsufficientQuantity
+		}
+
+		item.Quantity = itemQuantityUpdate.NewQuantity
+		item.Name = product.Name
+		item.Price = product.Price
+		item.SubTotal = int64(item.Quantity) * item.Price
+
+		updatedItems = append(updatedItems, item)
+
+		break
+	}
+
+	if !found {
+		return ErrItemNotFound
+	}
+
+	// cache it
+	userCart.SetItems(updatedItems)
+	if err := svc.cartRepo.Save(userId.String(), userCart, cacheDuration); err != nil {
+		return ErrInternal
+	}
+	return nil
 }

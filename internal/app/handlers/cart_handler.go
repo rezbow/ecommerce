@@ -144,3 +144,55 @@ func (handler *CartHandler) ClearCart(ctx *gin.Context) {
 	}
 	ctx.Status(http.StatusNoContent)
 }
+
+func (handler *CartHandler) UpdateItemQuantity(ctx *gin.Context) {
+	value, _ := ctx.Get("userId")
+	userId, ok := value.(uuid.UUID)
+	if !ok {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"error": "unauthroized user",
+		})
+		return
+	}
+	productId, err := uuid.Parse(ctx.Param("id"))
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	var itemQuantityUpdate models.ItemQuantityUpdate
+
+	if err := ctx.ShouldBindJSON(&itemQuantityUpdate); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if valid, errs := itemQuantityUpdate.Validate(); !valid {
+		ctx.JSON(http.StatusBadRequest, gin.H{"errors": errs})
+		return
+	}
+
+	if err := handler.cartSvc.UpdateItemQuantity(userId, productId, &itemQuantityUpdate); err != nil {
+		code, errStr := handleServiceErrs(err)
+		ctx.JSON(code, gin.H{"error": errStr})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "item quantity updated"})
+
+}
+
+func handleServiceErrs(err error) (int, string) {
+	switch {
+	case errors.Is(err, services.ErrProductNotFound):
+		return http.StatusNotFound, err.Error()
+	case errors.Is(err, services.ErrInsufficientQuantity):
+		return http.StatusBadRequest, err.Error()
+	case errors.Is(err, services.ErrItemNotFound):
+		return http.StatusNotFound, err.Error()
+	default:
+		return http.StatusInternalServerError, "internal server error"
+	}
+}
